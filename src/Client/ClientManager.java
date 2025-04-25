@@ -150,7 +150,7 @@ public class ClientManager {
         List<FileSearchResult> fsr = FileSearchDB.get(searchFileByName(name));
         DownloadTaskManager dtm = new DownloadTaskManager(this, fsr.getFirst().getFileInfo(),fsr);
         this.downloadThreads.put(dtm.getUid(), dtm);
-        dtm.startDownload();
+        dtm.start();
         return dtm;
 
     }
