@@ -3,6 +3,8 @@ package Server;
 import java.io.*;
 import java.net.*;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import Communication.Command;
 import Communication.MessageWrapper;
@@ -19,9 +21,27 @@ public class SocketServer extends Thread {
     private int port;
     private boolean running = true;    // Para controlar o estado da comunicação do servidor
     boolean isPortBound = false;
+    private static final BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
+    private static volatile boolean workerRunning = true;
 
     public SocketServer(int port) {
         this.port = port;
+    }
+
+    // ***
+    static {
+        Thread workerThread = new Thread(() -> {
+            while (workerRunning) {
+                try {
+                    Runnable task = taskQueue.take();
+                    task.run();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+        workerThread.start();
     }
 
     public synchronized void startServer() {
@@ -85,20 +105,32 @@ public class SocketServer extends Thread {
                         break; // Sai do switch
                     }
 
-                    case Command.DownloadMessage:{
-                        FileBlockRequestMessage data =  (FileBlockRequestMessage)  message.getData();
-                        FileBlockAnswerMessage result =  new FileBlockAnswerMessage(
-                                data.getFileHash(),
-                                data.getBlock(),
-                                data.getBlockID(),
-                                data.getDtmUID(),
-                                socket.getInetAddress().getHostAddress(),
-                                this.port);
-                        System.out.println("Server sending block " + result.getBlockId());
-                        out.writeObject(new MessageWrapper(
-                                message.getServerIp(),
-                                message.getServerPort(),
-                                Command.DownloadResult ,result));
+                    case Command.DownloadMessage: {
+                        FileBlockRequestMessage data = (FileBlockRequestMessage) message.getData();
+                        // Adicionar à fila em vez de processar imediatamente
+                        taskQueue.add(() -> {
+                            try {
+                                FileBlockAnswerMessage result = new FileBlockAnswerMessage(
+                                        data.getFileHash(),
+                                        data.getBlock(),
+                                        data.getBlockID(),
+                                        data.getDtmUID(),
+                                        socket.getInetAddress().getHostAddress(),
+                                        this.port
+                                );
+                                synchronized (out) { // Garantir sincronização ao escrever
+                                    out.writeObject(new MessageWrapper(
+                                            message.getServerIp(),
+                                            message.getServerPort(),
+                                            Command.DownloadResult,
+                                            result
+                                    ));
+                                }
+                                System.out.println("Server sending block " + result.getBlockId());
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        });
                         break;
                     }
 
@@ -122,6 +154,10 @@ public class SocketServer extends Thread {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public static void stopWorker() {
+        workerRunning = false;
     }
 
     public synchronized void socketStop() throws IOException {
