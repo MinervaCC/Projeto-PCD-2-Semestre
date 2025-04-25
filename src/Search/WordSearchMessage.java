@@ -43,4 +43,12 @@ public class WordSearchMessage implements Serializable {
         return count;
     }
 
+    public String getWordSearchMessage() {
+        return message;
+    }
+
+    // ***
+    public String getSearchTerm() {
+        return message;
+    }
 }

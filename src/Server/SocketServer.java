@@ -104,7 +104,7 @@ public class SocketServer extends Thread {
                                 result));    // Envia os resultados de volta para o cliente
                         break; // Sai do switch
                     }
-
+                    // ***
                     case Command.DownloadMessage: {
                         FileBlockRequestMessage data = (FileBlockRequestMessage) message.getData();
                         // Adicionar à fila em vez de processar imediatamente

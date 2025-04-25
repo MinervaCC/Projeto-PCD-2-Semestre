@@ -2,6 +2,7 @@ package GUI;
 
 import Client.*;
 import Communication.Command;
+import Communication.CountDownLatch;
 import Files.DownloadTaskManager;
 import Search.FileSearchResult;
 import Search.WordSearchMessage;
@@ -104,6 +105,47 @@ public class MainInterface {
 
         frame.add(rightPanel, BorderLayout.EAST);
 
+        /* // ***
+        buttonSearch.addActionListener(e -> {
+            String searchTerm = message.getText().trim();
+            if (searchTerm.isEmpty()) return;
+
+            searchResultsModel.clear();
+            clientManager.resetFileSearchDB();
+            clientManager.sendAll(Command.WordSearchMessage, new WordSearchMessage(searchTerm));
+            buttonSearch.setEnabled(false);
+
+            new Thread(() -> {
+                try {
+                    CountDownLatch latch = clientManager.getCurrentSearchLatch();
+                    long startTime = System.currentTimeMillis();
+                    long timeout = 3000; // 3 segundos em milissegundos
+
+                    // Loop até que o latch seja concluído ou timeout
+                    while (System.currentTimeMillis() - startTime < timeout && latch.getCount() > 0) {
+                        Thread.sleep(100); // Verifica a cada 100ms (ajustável)
+                    }
+
+                    SwingUtilities.invokeLater(() -> {
+                        HashMap<String, List<FileSearchResult>> data = clientManager.getData();
+                        if (data.isEmpty()) {
+                            searchResultsModel.addElement("Ficheiro não encontrado");
+                        } else {
+                            data.values().forEach(fileList -> {
+                                searchResultsModel.addElement(
+                                        fileList.get(0).getFileInfo().name + " <" + fileList.size() + ">"
+                                );
+                            });
+                        }
+                        buttonSearch.setEnabled(true);
+                    });
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
+        });
+
+        */
 
         buttonSearch.addActionListener(e -> {
 
@@ -135,6 +177,7 @@ public class MainInterface {
                 });
             });
         });
+
 
         buttonDownload.addActionListener(new ActionListener() {
             @Override
@@ -180,12 +223,12 @@ public class MainInterface {
 
                         // Blocos por nó
                         Map<String, Integer> blocksPerNode = dtm.getBlocksPerNodeStats();
-                        message.append("=== Download concluído com sucesso! ===\n");
+                        message.append("=== Download concluído com sucesso! ===");
                         blocksPerNode.forEach((node, count) -> {
                             String[] parts = node.split(":");
                             String ip = parts[0];
                             String port = parts[1];
-                            message.append(String.format("\n- %s [%s]: %d blocos (%.1f%%)\n",
+                            message.append(String.format("\n- %s [%s]: %d blocos (%.1f%%)",
                                     ip, port, count, (count * 100.0) / dtm.getTotalBlocks()));
                         });
 

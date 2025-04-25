@@ -21,4 +21,8 @@ public class CountDownLatch {
         }
     }
 
+    // ***
+    public int getCount() {
+        return count;
+    }
 }
