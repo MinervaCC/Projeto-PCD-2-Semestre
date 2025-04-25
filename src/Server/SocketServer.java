@@ -6,7 +6,7 @@ import java.util.List;
 
 import Communication.Command;
 import Communication.MessageWrapper;
-import Communication.NewConnectionRequest_NotUsedYet;
+import Communication.NewConnectionRequest;
 import Download.FileBlockAnswerMessage;
 import Download.FileBlockRequestMessage;
 import Files.FileInfo;
