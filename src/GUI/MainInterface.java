@@ -185,7 +185,7 @@ public class MainInterface {
                             String[] parts = node.split(":");
                             String ip = parts[0];
                             String port = parts[1];
-                            message.append(String.format("\n - %s [%s]: %d blocos (%.1f%%) \n",
+                            message.append(String.format("\n- %s [%s]: %d blocos (%.1f%%)\n",
                                     ip, port, count, (count * 100.0) / dtm.getTotalBlocks()));
                         });
 

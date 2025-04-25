@@ -16,7 +16,7 @@ public class Node {
         System.out.println("Port: " + port);
 
         // Create a node
-        SocketServer server =new SocketServer(port);
+        SocketServer server = new SocketServer(port);
         Thread thread_server = new Thread(new RunnableSocketServer(server));
         thread_server.start();
         ClientManager clientManager = new ClientManager();
