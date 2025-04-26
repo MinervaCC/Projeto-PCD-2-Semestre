@@ -41,12 +41,12 @@ public class DownloadTaskManager extends Thread {
         System.out.println("Download iniciado para: " + fileInfo.name);
         totalTime = System.currentTimeMillis();
 
-        // Inicializar fila de blocos
+        // Inicializa a queue de blocos
         for (int i = 0; i < fileInfo.blockNumber; i++) {
             pendingBlocks.add(i);
         }
 
-        // Criar threads de download
+        // Cria threads de download
         List<Thread> downloadThreads = new ArrayList<>();
         for (int i = 0; i < MAX_CONCURRENT_DOWNLOADS; i++) {
             Thread thread = new Thread(this::processBlocks);
@@ -54,7 +54,7 @@ public class DownloadTaskManager extends Thread {
             thread.start();
         }
 
-        // Aguardar término das threads
+        // Aguarda o término das threads
         downloadThreads.forEach(thread -> {
             try {
                 thread.join();
@@ -63,7 +63,7 @@ public class DownloadTaskManager extends Thread {
             }
         });
 
-        // Iniciar escrita em disco
+        // Iniciar a escrita no disco
         new Thread(this::writeFile).start();
     }
 
@@ -100,11 +100,11 @@ public class DownloadTaskManager extends Thread {
     public void addFileblock(int blockId, FileBlockAnswerMessage fileBlock) {
         completedBlocks.put(blockId, fileBlock);
 
-        // Atualizar estatísticas
+        // Atualizar as estatísticas
         String nodeKey = fileBlock.getSenderIP() + ":" + fileBlock.getSenderPort();
         blocksPerNode.merge(nodeKey, 1, Integer::sum);
 
-        // Notificar GUI
+        // Notificar a GUI
         notifyListeners(completedBlocks.size());
     }
 
@@ -118,11 +118,11 @@ public class DownloadTaskManager extends Thread {
             }
         }
 
-        // Escrever em disco
+        // Escrita em disco
         fileInfo.writeFile(new TreeMap<>(completedBlocks));
         System.out.println("Download concluído: " + fileInfo.name);
 
-        // Calcular tempo total
+        // Para calcular o tempo total
         totalTime = System.currentTimeMillis() - totalTime;
     }
 
