@@ -6,8 +6,6 @@ import Communication.Command;
 import Download.FileBlockAnswerMessage;
 import Download.FileBlockRequestMessage;
 import Search.FileSearchResult;
-
-import javax.swing.*;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,13 +46,9 @@ public class DownloadTaskManager extends Thread {
     public void run() {
         System.out.println("Download iniciado para: " + fileInfo.name);
         totalTime = System.currentTimeMillis();
-
-        // Inicializa a queue de blocos
-        for (int i = 0; i < fileInfo.blockNumber; i++) {
+        for (int i = 0; i < fileInfo.blockNumber; i++) {        // Inicializa a queue de blocos
             pendingBlocks.add(i);
         }
-
-        // **Modificado para usar Lock**
         List<Thread> downloadThreads = new ArrayList<>();
         for (int i = 0; i < MAX_CONCURRENT_DOWNLOADS; i++) {
             Thread thread = new Thread(() -> {
@@ -68,18 +62,14 @@ public class DownloadTaskManager extends Thread {
             thread.start();
             downloadThreads.add(thread);
         }
-
-        // Aguarda o término das threads
-        downloadThreads.forEach(thread -> {
+        downloadThreads.forEach(thread -> {        // Aguarda o término das threads
             try {
                 thread.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         });
-
-        // **Escrita com Condition**
-        new Thread(this::writeFileWithLock).start();
+        new Thread(this::writeFileWithLock).start();        // **Escrita com Condition**
     }
 
 
@@ -115,17 +105,13 @@ public class DownloadTaskManager extends Thread {
         lock.lock();
         try {
             completedBlocks.put(blockId, fileBlock);
-
-            // Atualizar estatísticas por nó
+            // Atualiza as estatísticas por nó
             String nodeKey = fileBlock.getSenderIP() + ":" + fileBlock.getSenderPort();
             blocksPerNode.merge(nodeKey, 1, Integer::sum);
 
-            // Notificar GUI do progresso atual
-            notifyListeners(completedBlocks.size()); // <--- Alteração crítica
-
-            // Sinalizar condição de conclusão apenas quando todos os blocos estiverem prontos
-            if (completedBlocks.size() == fileInfo.blockNumber) {
-                downloadComplete.signal(); // <--- Linha adicionada
+            notifyListeners(completedBlocks.size());     // Notificar  a GUI do progresso atual
+            if (completedBlocks.size() == fileInfo.blockNumber) {   // Sinaliza a Condition de conclusão apenas quando todos os blocos estiverem prontos
+                downloadComplete.signal();
             }
         } finally {
             lock.unlock();
