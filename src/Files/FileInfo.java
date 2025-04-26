@@ -20,14 +20,18 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
     public List<FileBlockInfo> fileBlockManagers;
     final int blocksize = 10240;
 
+    // Adicionar verificação no construtor:
     public FileInfo(File file) {
         if (file.isDirectory()) {
-            return;
+            throw new IllegalArgumentException("File is directory");
         }
         this.name = file.getName();
         this.fileSize = (int) file.length();
         this.blockNumber = (int) Math.ceil((double) fileSize / blocksize);
-        this.filehash = getFileHash(file); // <--- Pode retornar null
+        this.filehash = getFileHash(file);
+        if (this.filehash == null) { // Adicionado
+            throw new IllegalStateException("File hash calculation failed");
+        }
         this.fileBlockManagers = new ArrayList<>();
         splitFile(file);
     }
@@ -70,7 +74,6 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
         GlobalConfig gc = GlobalConfig.getInstance();
         String outputPath = gc.getDefaultPath() + this.name;
         File outputFile = new File(outputPath); // Declaração faltando
-
         // Ordena os blocos pelo ID antes de escrever
         Map<Integer, FileBlockAnswerMessage> sortedData = new TreeMap<>(data);
         try (OutputStream outputStream = new FileOutputStream(outputFile)) {
@@ -92,6 +95,8 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
         return this.filehash.compareTo(other.filehash);
     }
 
-
-
 }
+
+
+
+

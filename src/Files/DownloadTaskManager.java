@@ -7,6 +7,7 @@ import Download.FileBlockAnswerMessage;
 import Download.FileBlockRequestMessage;
 import Search.FileSearchResult;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -114,11 +115,17 @@ public class DownloadTaskManager extends Thread {
         lock.lock();
         try {
             completedBlocks.put(blockId, fileBlock);
+
+            // Atualizar estatísticas por nó
             String nodeKey = fileBlock.getSenderIP() + ":" + fileBlock.getSenderPort();
             blocksPerNode.merge(nodeKey, 1, Integer::sum);
-            notifyListeners(completedBlocks.size());
+
+            // Notificar GUI do progresso atual
+            notifyListeners(completedBlocks.size()); // <--- Alteração crítica
+
+            // Sinalizar condição de conclusão apenas quando todos os blocos estiverem prontos
             if (completedBlocks.size() == fileInfo.blockNumber) {
-                downloadComplete.signal(); // Notifica conclusão
+                downloadComplete.signal(); // <--- Linha adicionada
             }
         } finally {
             lock.unlock();
@@ -144,7 +151,7 @@ public class DownloadTaskManager extends Thread {
     private void notifyListeners(int blocksDownloaded) {
         float progress = (float) blocksDownloaded / fileInfo.blockNumber * 100;
         listeners.forEach(listener ->
-                listener.onRequestComplete(fileInfo.name, (int) progress)
+                listener.onRequestComplete(fileInfo.name, (int) progress) // Já corrigido
         );
     }
 
@@ -170,3 +177,4 @@ public class DownloadTaskManager extends Thread {
         listeners.add(listener);
     }
 }
+

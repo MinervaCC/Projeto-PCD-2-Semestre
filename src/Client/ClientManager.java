@@ -131,15 +131,14 @@ public class ClientManager {
                 }
                 break;
             }
-            case Command.DownloadResult: {
+            case DownloadResult: {
                 FileBlockAnswerMessage received = (FileBlockAnswerMessage) message.getData();
-                String dtmUID = received.getDtmUID();
-                DownloadTaskManager dtm = downloadThreads.get(dtmUID);
-                if (dtm != null) {
-                    dtm.addFileblock(received.getBlockId(), received);
-                } else {
-                    System.err.println("DownloadTaskManager não encontrado para UID: " + dtmUID);
-                }
+                System.out.println("Cliente received block: " + received.getBlockId());
+                downloadThreads.get(received.getDtmUID()).addFileblock(received.getBlockId(), received);
+                break;
+            }
+            default: {
+                System.out.println(message.getData().toString() + Thread.currentThread().getName());
                 break;
             }
         }
@@ -175,41 +174,17 @@ public class ClientManager {
     }
 
     public DownloadTaskManager startDownloadThreads(String name) {
-        // 1. Procurar o hash do arquivo pelo nome
         String fileHash = searchFileByName(name);
-        if (fileHash == null) {
-            System.err.println("Arquivo não encontrado: " + name);
-            return null;
-        }
-
-        // 2. Obter lista de resultados da pesquisa
+        if (fileHash == null) return null;
         List<FileSearchResult> fsr = FileSearchDB.get(fileHash);
-        if (fsr == null || fsr.isEmpty()) {
-            System.err.println("Nenhum nó disponível para: " + name);
-            return null;
-        }
+        if (fsr == null || fsr.isEmpty()) return null;
 
-        // 3. Criar nova tarefa de download
-        DownloadTaskManager dtm = new DownloadTaskManager(
-                this,
-                fsr.get(0).getFileInfo(),
-                fsr
-        );
-
-        // 4. Garantir inicialização do UID antes do registro
-        String uid = dtm.getUid(); // Força a inicialização do UID
-
-        // 5. Registrar a tarefa antes de iniciar
-        synchronized (downloadThreads) { // Sincronização para acesso concorrente
-            downloadThreads.put(uid, dtm);
-            System.out.println("Registrada nova tarefa com UID: " + uid);
-        }
-
-        // 6. Iniciar a thread de download
+        DownloadTaskManager dtm = new DownloadTaskManager(this, fsr.get(0).getFileInfo(), fsr);
+        this.downloadThreads.put(dtm.getUid(), dtm);
         dtm.start();
-
         return dtm;
     }
+
     public void addListener(ClientManagerListener listener) {
         listeners.add(listener);
     }
