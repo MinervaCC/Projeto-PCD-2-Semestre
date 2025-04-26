@@ -1,18 +1,10 @@
 package GUI;
 
-import Client.*;
 import Communication.Command;
-import Communication.CountDownLatch;
 import Files.DownloadTaskManager;
 import Search.FileSearchResult;
 import Search.WordSearchMessage;
-import Server.RunnableSocketServer;
-import Server.SocketServer;
-
 import Client.ClientManager;
-import Communication.Command;
-import Search.FileSearchResult;
-
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -20,12 +12,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.*;
 import java.util.List;
-
 import javax.swing.*;
 import javax.swing.Timer;
-import javax.swing.event.ListSelectionListener;
 
-import static java.lang.Thread.sleep;
 
 public class MainInterface {
 
@@ -73,82 +62,27 @@ public class MainInterface {
 
         // Layout do Painel lateral esquerdo e central
         JPanel leftPanel = new JPanel(new BorderLayout());
-
         searchResultsModel = new DefaultListModel<>();
         JList<String> searchResultsList = new JList<>(searchResultsModel);
-
         JScrollPane scrollPane = new JScrollPane(searchResultsList);
         leftPanel.add(scrollPane, BorderLayout.CENTER);
-
         frame.add(scrollPane, BorderLayout.CENTER);
-
-
         downloadResultsModel = new DefaultListModel<>();
-
         JList<String> downloadResultsList = new JList<>(downloadResultsModel);
-
         bottomPanel.add(downloadResultsList, BorderLayout.SOUTH);
 
         //leftPanel.add(leftPanel, BorderLayout.SOUTH);
         frame.add(downloadResultsList, BorderLayout.SOUTH);
 
-
         // Layout do Painel lateral direito
         JPanel rightPanel = new JPanel(new GridLayout(2,1));
-
         JButton buttonDownload = new JButton("Descarregar");
         JButton buttonNode = new JButton("Ligar a Nó");
-
-
         rightPanel.add(buttonDownload, BorderLayout.NORTH);
         rightPanel.add(buttonNode, BorderLayout.SOUTH);
-
         frame.add(rightPanel, BorderLayout.EAST);
 
-        /* // ***
         buttonSearch.addActionListener(e -> {
-            String searchTerm = message.getText().trim();
-            if (searchTerm.isEmpty()) return;
-
-            searchResultsModel.clear();
-            clientManager.resetFileSearchDB();
-            clientManager.sendAll(Command.WordSearchMessage, new WordSearchMessage(searchTerm));
-            buttonSearch.setEnabled(false);
-
-            new Thread(() -> {
-                try {
-                    CountDownLatch latch = clientManager.getCurrentSearchLatch();
-                    long startTime = System.currentTimeMillis();
-                    long timeout = 3000; // 3 segundos em milissegundos
-
-                    // Loop até que o latch seja concluído ou timeout
-                    while (System.currentTimeMillis() - startTime < timeout && latch.getCount() > 0) {
-                        Thread.sleep(100); // Verifica a cada 100ms (ajustável)
-                    }
-
-                    SwingUtilities.invokeLater(() -> {
-                        HashMap<String, List<FileSearchResult>> data = clientManager.getData();
-                        if (data.isEmpty()) {
-                            searchResultsModel.addElement("Ficheiro não encontrado");
-                        } else {
-                            data.values().forEach(fileList -> {
-                                searchResultsModel.addElement(
-                                        fileList.get(0).getFileInfo().name + " <" + fileList.size() + ">"
-                                );
-                            });
-                        }
-                        buttonSearch.setEnabled(true);
-                    });
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-            }).start();
-        });
-
-        */
-
-        buttonSearch.addActionListener(e -> {
-
             String searchTerm = message.getText().trim();
             if (searchTerm.isEmpty()) {
                 return;
@@ -255,9 +189,5 @@ public class MainInterface {
             }
         });
     }
-
-
-
-
 
 }

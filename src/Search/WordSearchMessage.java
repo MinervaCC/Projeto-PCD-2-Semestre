@@ -5,7 +5,10 @@ import Files.FileInfo;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class WordSearchMessage implements Serializable {
     private final String message;
@@ -14,40 +17,43 @@ public class WordSearchMessage implements Serializable {
         this.message = text;
     }
 
-    public List<FileInfo> search(){
+    public List<FileInfo> search() {
         GlobalConfig gc = GlobalConfig.getInstance();
-        Map<FileInfo,Integer> occurrenceMap = new TreeMap<FileInfo, Integer>();
+        Map<FileInfo, Integer> occurrenceMap = new TreeMap<>();
         File[] files = gc.getFilesInDirectory();
-        System.out.println(Arrays.toString(files));
+
         for (File file : files) {
-            //if (!file.getName().endsWith(".ser")){
-                int occurrences = countOccurrences(file.getName());
-                FileInfo info = new FileInfo(file);
-                if(occurrences != 0)
-                    occurrenceMap.put(info, occurrences);
-            //}
+            FileInfo info = new FileInfo(file);
+            int occurrences = countOccurrences(file.getName());
+
+            // Verificação de completude via sistema de arquivos
+            boolean isComplete = isFileComplete(info, gc.getDefaultPath());
+
+            if (isComplete && occurrences != 0) {
+                occurrenceMap.put(info, occurrences);
+            }
         }
         return new ArrayList<>(occurrenceMap.keySet());
     }
 
-    public int countOccurrences(String text) {
+    private int countOccurrences(String text) {
         int n = text.length();
         int m = this.message.length();
         int count = 0;
 
         for (int s = 0; s <= n - m; s++) {
-            if (text.substring(s, s + m).equals(this.message)) {
+            if (text.substring(s, s + m).equalsIgnoreCase(this.message)) {
                 count++;
             }
         }
         return count;
     }
 
-    public String getWordSearchMessage() {
-        return message;
+    private boolean isFileComplete(FileInfo info, String basePath) {
+        File file = new File(basePath + info.name);
+        return file.exists() && file.length() == info.fileSize;
     }
 
-    // ***
     public String getSearchTerm() {
         return message;
     }

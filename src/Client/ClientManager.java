@@ -10,21 +10,46 @@ import Search.WordSearchMessage;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class ClientManager {
+    // Campos declarados corretamente
     private final Map<ClientThread, Boolean> clientThreads;
     private final HashMap<String, List<FileSearchResult>> FileSearchDB;
     private final Map<String, DownloadTaskManager> downloadThreads = new HashMap<>();
-    private final ExecutorService threadPool = Executors.newFixedThreadPool(5);
     private final List<ClientManagerListener> listeners = new ArrayList<>();
     private CountDownLatch currentSearchLatch;
     private String currentSearchTerm;
+    private final Queue<Runnable> taskQueue = new LinkedList<>();
+    private final List<Thread> workerThreads = new ArrayList<>();
 
     public ClientManager() {
         this.clientThreads = new TreeMap<>();
         this.FileSearchDB = new HashMap<>();
+
+        // Inicializar threads manuais
+        for (int i = 0; i < 5; i++) {
+            Thread worker = new Thread(() -> {
+                while (true) {
+                    Runnable task;
+                    synchronized (taskQueue) {
+                        while (taskQueue.isEmpty()) {
+                            try {
+                                taskQueue.wait();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        }
+                        task = taskQueue.poll();
+                    }
+                    task.run();
+                }
+            });
+            worker.start();
+            workerThreads.add(worker);
+        }
     }
 
     // Método sincronizado para definir a pesquisa atual
@@ -33,12 +58,10 @@ public class ClientManager {
         this.currentSearchLatch = latch;
     }
 
-    // Método sincronizado para obter o latch
     public synchronized CountDownLatch getCurrentSearchLatch() {
         return currentSearchLatch;
     }
 
-    // Método sincronizado para obter o termo de pesquisa
     public synchronized String getCurrentSearchTerm() {
         return currentSearchTerm;
     }
@@ -61,30 +84,32 @@ public class ClientManager {
             if (!(message instanceof WordSearchMessage)) {
                 return;
             }
+
             WordSearchMessage searched = (WordSearchMessage) message;
-            // Conta apenas nós ativos (não ocupados)
             long activeNodes = clientThreads.values().stream().filter(status -> !status).count();
             setCurrentSearch(searched.getSearchTerm(), new CountDownLatch((int) activeNodes));
 
             for (ClientThread clientThread : clientThreads.keySet()) {
-                if (!clientThreads.get(clientThread)) { // Se o nó está ativo
-                    threadPool.submit(() -> {
-                        try {
-                            clientThreads.replace(clientThread, true); // Marca como ocupado
-                            clientThread.sendObject(command, message);
-                        } catch (InterruptedException | IOException e) {
-                            // Se falhar, decrementa o latch
-                            synchronized (ClientManager.this) {
-                                if (currentSearchLatch != null) {
-                                    currentSearchLatch.countDown();
+                Boolean status = clientThreads.get(clientThread);
+                if (status != null && !status) {
+                    synchronized (taskQueue) {
+                        taskQueue.add(() -> {
+                            try {
+                                clientThreads.replace(clientThread, true);
+                                clientThread.sendObject(command, message);
+                            } catch (IOException | InterruptedException e) {
+                                synchronized (ClientManager.this) {
+                                    if (currentSearchLatch != null) {
+                                        currentSearchLatch.countDown();
+                                    }
                                 }
+                            } finally {
+                                clientThreads.replace(clientThread, false);
                             }
-                        } finally {
-                            clientThreads.replace(clientThread, false); // Libera o nó
-                        }
-                    });
+                        });
+                        taskQueue.notify();
+                    }
                 } else {
-                    // Nó inativo: decrementa o latch
                     if (currentSearchLatch != null) {
                         currentSearchLatch.countDown();
                     }
@@ -95,13 +120,12 @@ public class ClientManager {
 
     public void receive(MessageWrapper message, ClientThread clientThread) {
         switch (message.getCommand()) {
-            case Command.FileSearchResult: {
+            case FileSearchResult: {
                 FileSearchResult[] received = (FileSearchResult[]) message.getData();
                 for (FileSearchResult file : received) {
                     addToFileSearchResult(file);
                 }
                 clientThreads.replace(clientThread, false);
-                // ***
                 if (currentSearchLatch != null) {
                     currentSearchLatch.countDown();
                 }
@@ -109,52 +133,83 @@ public class ClientManager {
             }
             case Command.DownloadResult: {
                 FileBlockAnswerMessage received = (FileBlockAnswerMessage) message.getData();
-                System.out.println("Cliente received block: " + received.getBlockId());
-                downloadThreads.get(received.getDtmUID()).addFileblock(received.getBlockId(), received);
-                break;
-            }
-            default: {
-                System.out.println(message.getData().toString() + Thread.currentThread().getName());
+                String dtmUID = received.getDtmUID();
+                DownloadTaskManager dtm = downloadThreads.get(dtmUID);
+                if (dtm != null) {
+                    dtm.addFileblock(received.getBlockId(), received);
+                } else {
+                    System.err.println("DownloadTaskManager não encontrado para UID: " + dtmUID);
+                }
                 break;
             }
         }
     }
 
-    public  HashMap<String, List<FileSearchResult>> getData() {
+    public HashMap<String, List<FileSearchResult>> getData() {
         return this.FileSearchDB;
     }
 
     private void addToFileSearchResult(FileSearchResult file) {
-        if(this.FileSearchDB.containsKey(file.getFileInfo().filehash)){
-            this.FileSearchDB.get(file.getFileInfo().filehash).add(file);
-        }else{
-            this.FileSearchDB.put(file.getFileInfo().filehash, new ArrayList<>() {{ add(file);}});
+        String fileHash = file.getFileInfo().filehash;
+        if (this.FileSearchDB.containsKey(fileHash)) {
+            this.FileSearchDB.get(fileHash).add(file);
+        } else {
+            List<FileSearchResult> newList = new ArrayList<>();
+            newList.add(file);
+            this.FileSearchDB.put(fileHash, newList);
         }
         notifyListeners();
     }
 
-    public void resetFileSearchDB(){
+    public void resetFileSearchDB() {
         this.FileSearchDB.clear();
     }
 
-    public String searchFileByName(String name){
-        for(List<FileSearchResult> fs   : FileSearchDB.values() ){
-            if(fs.getFirst().getFileInfo().name.equals(name)){
-                return fs.getFirst().getFileInfo().filehash;
+    public String searchFileByName(String name) {
+        for (List<FileSearchResult> fs : FileSearchDB.values()) {
+            if (!fs.isEmpty() && fs.get(0).getFileInfo().name.equals(name)) {
+                return fs.get(0).getFileInfo().filehash;
             }
         }
         return null;
     }
 
     public DownloadTaskManager startDownloadThreads(String name) {
-        List<FileSearchResult> fsr = FileSearchDB.get(searchFileByName(name));
-        DownloadTaskManager dtm = new DownloadTaskManager(this, fsr.getFirst().getFileInfo(),fsr);
-        this.downloadThreads.put(dtm.getUid(), dtm);
+        // 1. Procurar o hash do arquivo pelo nome
+        String fileHash = searchFileByName(name);
+        if (fileHash == null) {
+            System.err.println("Arquivo não encontrado: " + name);
+            return null;
+        }
+
+        // 2. Obter lista de resultados da pesquisa
+        List<FileSearchResult> fsr = FileSearchDB.get(fileHash);
+        if (fsr == null || fsr.isEmpty()) {
+            System.err.println("Nenhum nó disponível para: " + name);
+            return null;
+        }
+
+        // 3. Criar nova tarefa de download
+        DownloadTaskManager dtm = new DownloadTaskManager(
+                this,
+                fsr.get(0).getFileInfo(),
+                fsr
+        );
+
+        // 4. Garantir inicialização do UID antes do registro
+        String uid = dtm.getUid(); // Força a inicialização do UID
+
+        // 5. Registrar a tarefa antes de iniciar
+        synchronized (downloadThreads) { // Sincronização para acesso concorrente
+            downloadThreads.put(uid, dtm);
+            System.out.println("Registrada nova tarefa com UID: " + uid);
+        }
+
+        // 6. Iniciar a thread de download
         dtm.start();
+
         return dtm;
-
     }
-
     public void addListener(ClientManagerListener listener) {
         listeners.add(listener);
     }
@@ -164,5 +219,4 @@ public class ClientManager {
             listener.onRequestComplete();
         }
     }
-
 }

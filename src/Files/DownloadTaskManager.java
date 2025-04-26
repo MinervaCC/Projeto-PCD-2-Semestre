@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class DownloadTaskManager extends Thread {
     private final ClientManager clientManager;
@@ -19,6 +21,10 @@ public class DownloadTaskManager extends Thread {
 
     private final String uid = UUID.randomUUID().toString();
     private final int MAX_CONCURRENT_DOWNLOADS = 5;
+
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition blocksAvailable = lock.newCondition();
+    private final Condition downloadComplete = lock.newCondition();
 
     // Estruturas para controle de blocos
     private final Queue<Integer> pendingBlocks = new ConcurrentLinkedQueue<>();
@@ -29,6 +35,7 @@ public class DownloadTaskManager extends Thread {
     private final Map<String, Integer> blocksPerNode = new ConcurrentHashMap<>();
     private final List<DownloadTaskManagerListener> listeners = new ArrayList<>();
     private long totalTime;
+
 
     public DownloadTaskManager(ClientManager clientManager, FileInfo fileInfo, List<FileSearchResult> nodes) {
         this.clientManager = clientManager;
@@ -46,12 +53,19 @@ public class DownloadTaskManager extends Thread {
             pendingBlocks.add(i);
         }
 
-        // Cria threads de download
+        // **Modificado para usar Lock**
         List<Thread> downloadThreads = new ArrayList<>();
         for (int i = 0; i < MAX_CONCURRENT_DOWNLOADS; i++) {
-            Thread thread = new Thread(this::processBlocks);
-            downloadThreads.add(thread);
+            Thread thread = new Thread(() -> {
+                while (!pendingBlocks.isEmpty()) { // Processa até a fila esvaziar
+                    Integer blockId = pendingBlocks.poll();
+                    if (blockId != null) {
+                        processSingleBlock(blockId);
+                    }
+                }
+            });
             thread.start();
+            downloadThreads.add(thread);
         }
 
         // Aguarda o término das threads
@@ -63,67 +77,68 @@ public class DownloadTaskManager extends Thread {
             }
         });
 
-        // Iniciar a escrita no disco
-        new Thread(this::writeFile).start();
+        // **Escrita com Condition**
+        new Thread(this::writeFileWithLock).start();
     }
 
-    private void processBlocks() {
-        while (!pendingBlocks.isEmpty()) {
-            Integer blockId = pendingBlocks.poll();
-            if (blockId == null) return;
 
-            inProgressBlocks.put(blockId, true);
-
+    private void processSingleBlock(Integer blockId) {
+        try {
+            FileSearchResult node = availableNodes.get(new Random().nextInt(availableNodes.size()));
+            ClientThread thread = new ClientThread(clientManager, node.getIp(), node.getPort());
+            // CORREÇÃO: Enviar FileBlockRequestMessage, não AnswerMessage!
+            thread.sendObject(
+                    Command.DownloadMessage,
+                    new FileBlockRequestMessage( // Alterado para Request
+                            fileInfo.fileBlockManagers.get(blockId),
+                            fileInfo.filehash,
+                            uid,
+                            blockId
+                    )
+            );
+        } catch (IOException | InterruptedException e) {
+            lock.lock();
             try {
-                FileSearchResult node = availableNodes.get(
-                        new Random().nextInt(availableNodes.size())
-                );
-
-                ClientThread thread = new ClientThread(clientManager, node.getIp(), node.getPort());
-                thread.sendObject(
-                        Command.DownloadMessage,
-                        new FileBlockRequestMessage(
-                                fileInfo.fileBlockManagers.get(blockId),
-                                fileInfo.filehash,
-                                uid,
-                                blockId
-                        )
-                );
-            } catch (IOException | InterruptedException e) {
-                pendingBlocks.add(blockId); // Reenfileira em caso de falha
+                pendingBlocks.add(blockId); // Recoloca o bloco na fila
+                blocksAvailable.signal();  // Notifica outras threads
             } finally {
-                inProgressBlocks.remove(blockId);
+                lock.unlock();
             }
+        } finally {
+            inProgressBlocks.remove(blockId);
         }
     }
+
 
     public void addFileblock(int blockId, FileBlockAnswerMessage fileBlock) {
-        completedBlocks.put(blockId, fileBlock);
-
-        // Atualizar as estatísticas
-        String nodeKey = fileBlock.getSenderIP() + ":" + fileBlock.getSenderPort();
-        blocksPerNode.merge(nodeKey, 1, Integer::sum);
-
-        // Notificar a GUI
-        notifyListeners(completedBlocks.size());
+        lock.lock();
+        try {
+            completedBlocks.put(blockId, fileBlock);
+            String nodeKey = fileBlock.getSenderIP() + ":" + fileBlock.getSenderPort();
+            blocksPerNode.merge(nodeKey, 1, Integer::sum);
+            notifyListeners(completedBlocks.size());
+            if (completedBlocks.size() == fileInfo.blockNumber) {
+                downloadComplete.signal(); // Notifica conclusão
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
-    private void writeFile() {
-        // Aguardar conclusão de todos os blocos
-        while (completedBlocks.size() < fileInfo.blockNumber) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+    private void writeFileWithLock() {
+        lock.lock();
+        try {
+            while (completedBlocks.size() < fileInfo.blockNumber) {
+                downloadComplete.await(); // Aguarda sinal
             }
+            fileInfo.writeFile(new TreeMap<>(completedBlocks));
+            System.out.println("Download concluído: " + fileInfo.name);
+            totalTime = System.currentTimeMillis() - totalTime;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            lock.unlock();
         }
-
-        // Escrita em disco
-        fileInfo.writeFile(new TreeMap<>(completedBlocks));
-        System.out.println("Download concluído: " + fileInfo.name);
-
-        // Para calcular o tempo total
-        totalTime = System.currentTimeMillis() - totalTime;
     }
 
     private void notifyListeners(int blocksDownloaded) {

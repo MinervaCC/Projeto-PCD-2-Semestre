@@ -10,6 +10,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class FileInfo implements Serializable, Comparable<FileInfo> {
     public String name;
@@ -19,20 +20,19 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
     public List<FileBlockInfo> fileBlockManagers;
     final int blocksize = 10240;
 
-    public FileInfo(File file){
-         if( file.isDirectory()){
-             return;
-         }
-         this.name = file.getName();
-         this.fileSize = (int) file.length();
-         this.blockNumber = (int) Math.ceil( (double) fileSize / blocksize) ;  // Calcula o número de blocos
-         this.filehash = getFileHash(file);   // Obtém o hash do arquivo
-         this.fileBlockManagers = new ArrayList<>();
-         splitFile(file);
+    public FileInfo(File file) {
+        if (file.isDirectory()) {
+            return;
+        }
+        this.name = file.getName();
+        this.fileSize = (int) file.length();
+        this.blockNumber = (int) Math.ceil((double) fileSize / blocksize);
+        this.filehash = getFileHash(file); // <--- Pode retornar null
+        this.fileBlockManagers = new ArrayList<>();
+        splitFile(file);
+    }
 
-     }
-
-    private  String getFileHash(File file) {
+    private String getFileHash(File file) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             try (InputStream inputStream = Files.newInputStream(file.toPath())) { // Cria um fluxo de entrada para ler o arquivo
@@ -68,13 +68,14 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
 
     void writeFile(Map<Integer, FileBlockAnswerMessage> data) {
         GlobalConfig gc = GlobalConfig.getInstance();
-        String outputPath = gc.getDefaultPath() + this.name; // Get the output file path
-        File outputFile = new File(outputPath);
+        String outputPath = gc.getDefaultPath() + this.name;
+        File outputFile = new File(outputPath); // Declaração faltando
 
+        // Ordena os blocos pelo ID antes de escrever
+        Map<Integer, FileBlockAnswerMessage> sortedData = new TreeMap<>(data);
         try (OutputStream outputStream = new FileOutputStream(outputFile)) {
-            for(int i = 0; i < data.size(); i++){
-                byte[] blockData = data.get(i).getData();
-                outputStream.write(blockData);
+            for (Map.Entry<Integer, FileBlockAnswerMessage> entry : sortedData.entrySet()) {
+                outputStream.write(entry.getValue().getData());
             }
             System.out.println("File successfully written to: " + outputPath);
         } catch (IOException e) {

@@ -8,7 +8,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import Communication.Command;
 import Communication.MessageWrapper;
-import Communication.NewConnectionRequest;
 import Download.FileBlockAnswerMessage;
 import Download.FileBlockRequestMessage;
 import Files.FileInfo;
