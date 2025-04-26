@@ -23,15 +23,12 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
     // Adicionar verificação no construtor:
     public FileInfo(File file) {
         if (file.isDirectory()) {
-            throw new IllegalArgumentException("File is directory");
+            return;
         }
         this.name = file.getName();
         this.fileSize = (int) file.length();
         this.blockNumber = (int) Math.ceil((double) fileSize / blocksize);
-        this.filehash = getFileHash(file);
-        if (this.filehash == null) { // Adicionado
-            throw new IllegalStateException("File hash calculation failed");
-        }
+        this.filehash = getFileHash(file); // <--- Pode retornar null
         this.fileBlockManagers = new ArrayList<>();
         splitFile(file);
     }
