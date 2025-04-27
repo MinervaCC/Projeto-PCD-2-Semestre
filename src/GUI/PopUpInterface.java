@@ -1,8 +1,6 @@
 package GUI;
 
 import Client.ClientManager;
-import Client.ClientThread;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
