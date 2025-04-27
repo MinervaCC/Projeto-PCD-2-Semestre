@@ -4,6 +4,7 @@ package Communication;
 
 public enum Command {
     ConnectionRequest,
+    ConnectionAck,
     String,
     Terminate,
     FileSearchResult,
