@@ -84,8 +84,9 @@ public class DownloadTaskManager extends Thread {
             // CORREÇÃO: Enviar FileBlockRequestMessage, não AnswerMessage!
             thread.sendObject(
                     Command.DownloadMessage,
-                    new FileBlockRequestMessage( // Alterado para Request
+                    new FileBlockRequestMessage(
                             fileInfo.fileBlockManagers.get(blockId),
+                            fileInfo.name, // NOME DO FICHEIRO ADICIONADO
                             fileInfo.filehash,
                             uid,
                             blockId

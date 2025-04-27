@@ -9,11 +9,13 @@ import java.io.Serializable;
 
 public class FileBlockRequestMessage implements Serializable {
     private final FileBlockInfo requestBlock;
+    private final String fileName;
     private final String fileHash;
     private final String dtmUID;
     private final int blockID;
 
-    public FileBlockRequestMessage(FileBlockInfo requestBlock, String fileHash, String dtmUID, int blockID) {
+    public FileBlockRequestMessage(FileBlockInfo requestBlock, String fileName, String fileHash, String dtmUID, int blockID) {
+        this.fileName = fileName;
         this.blockID = blockID;
         this.requestBlock = requestBlock;
         this.fileHash = fileHash;
@@ -37,7 +39,7 @@ public class FileBlockRequestMessage implements Serializable {
         File[] files = gc.getFilesInDirectory();
         for (File file : files) {
             FileInfo info = new FileInfo(file);
-            if(info.filehash.equals(fileHash)){
+            if (file.getName().equals(this.fileName)) {
                 return requestBlock.readFileBytesInRange(file);
             }
         }

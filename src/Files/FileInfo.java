@@ -66,7 +66,6 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
         }
     }
 
-
     void writeFile(Map<Integer, FileBlockAnswerMessage> data) {
         GlobalConfig gc = GlobalConfig.getInstance();
         String outputPath = gc.getDefaultPath() + this.name;
@@ -89,7 +88,7 @@ public class FileInfo implements Serializable, Comparable<FileInfo> {
     }
     @Override
     public int compareTo(FileInfo other) {
-        return this.filehash.compareTo(other.filehash);
+        return this.name.compareTo(other.name); // Ordenação por nome
     }
 
 }
