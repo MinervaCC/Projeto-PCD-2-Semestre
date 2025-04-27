@@ -19,7 +19,6 @@ public class DownloadTaskManager extends Thread {
     private final List<FileSearchResult> availableNodes;
 
     private final String uid = UUID.randomUUID().toString();
-    private final int MAX_CONCURRENT_DOWNLOADS = 5;
 
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition blocksAvailable = lock.newCondition();
@@ -49,7 +48,20 @@ public class DownloadTaskManager extends Thread {
         for (int i = 0; i < fileInfo.blockNumber; i++) {        // Inicializa a queue de blocos
             pendingBlocks.add(i);
         }
+        List<Thread> downloadThreads = getThreads();
+        downloadThreads.forEach(thread -> {        // Aguarda o término das threads
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        new Thread(this::writeFileWithLock).start();        // **Escrita com Condition**
+    }
+
+    private List<Thread> getThreads() {
         List<Thread> downloadThreads = new ArrayList<>();
+        int MAX_CONCURRENT_DOWNLOADS = 5;
         for (int i = 0; i < MAX_CONCURRENT_DOWNLOADS; i++) {
             Thread thread = new Thread(() -> {
                 while (!pendingBlocks.isEmpty()) { // Processa até a fila esvaziar
@@ -62,16 +74,8 @@ public class DownloadTaskManager extends Thread {
             thread.start();
             downloadThreads.add(thread);
         }
-        downloadThreads.forEach(thread -> {        // Aguarda o término das threads
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
-        new Thread(this::writeFileWithLock).start();        // **Escrita com Condition**
+        return downloadThreads;
     }
-
 
     private void processSingleBlock(Integer blockId) {
         try {
@@ -100,7 +104,6 @@ public class DownloadTaskManager extends Thread {
         }
     }
 
-
     public void addFileblock(int blockId, FileBlockAnswerMessage fileBlock) {
         lock.lock();
         try {
@@ -123,6 +126,10 @@ public class DownloadTaskManager extends Thread {
         try {
             while (completedBlocks.size() < fileInfo.blockNumber) {
                 downloadComplete.await(); // Aguarda sinal
+                // Verificação adicional para evitar loop infinito
+                if (completedBlocks.size() == fileInfo.blockNumber) {
+                    break;
+                }
             }
             fileInfo.writeFile(new TreeMap<>(completedBlocks));
             System.out.println("Download concluído: " + fileInfo.name);

@@ -21,7 +21,7 @@ public class ClientManager {
     private final List<ClientManagerListener> listeners = new ArrayList<>();
     private CountDownLatch currentSearchLatch;
     private String currentSearchTerm;
-    private final Queue<Runnable> taskQueue = new LinkedList<>();
+    private final Queue<Runnable> queue = new LinkedList<>();
     private final List<Thread> workerThreads = new ArrayList<>();
 
     public ClientManager() {
@@ -33,16 +33,16 @@ public class ClientManager {
             Thread worker = new Thread(() -> {
                 while (true) {
                     Runnable task;
-                    synchronized (taskQueue) {
-                        while (taskQueue.isEmpty()) {
+                    synchronized (queue) {
+                        while (queue.isEmpty()) {
                             try {
-                                taskQueue.wait();
+                                queue.wait();
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                                 return;
                             }
                         }
-                        task = taskQueue.poll();
+                        task = queue.poll();
                     }
                     task.run();
                 }
@@ -92,22 +92,25 @@ public class ClientManager {
             for (ClientThread clientThread : clientThreads.keySet()) {
                 Boolean status = clientThreads.get(clientThread);
                 if (status != null && !status) {
-                    synchronized (taskQueue) {
-                        taskQueue.add(() -> {
-                            try {
-                                clientThreads.replace(clientThread, true);
-                                clientThread.sendObject(command, message);
-                            } catch (IOException | InterruptedException e) {
-                                synchronized (ClientManager.this) {
-                                    if (currentSearchLatch != null) {
-                                        currentSearchLatch.countDown();
+                    synchronized (queue
+                    ) { // Bloco sincronizado na taskQueue
+                        queue.add(() -> {
+                            synchronized (clientThreads) { // Sincronização no acesso às clientThreads
+                                try {
+                                    clientThreads.replace(clientThread, true);
+                                    clientThread.sendObject(command, message);
+                                } catch (IOException | InterruptedException e) {
+                                    synchronized (ClientManager.this) {
+                                        if (currentSearchLatch != null) {
+                                            currentSearchLatch.countDown();
+                                        }
                                     }
+                                } finally {
+                                    clientThreads.replace(clientThread, false);
                                 }
-                            } finally {
-                                clientThreads.replace(clientThread, false);
                             }
                         });
-                        taskQueue.notify();
+                        queue.notify();
                     }
                 } else {
                     if (currentSearchLatch != null) {
