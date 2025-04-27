@@ -64,6 +64,7 @@ public class MainInterface {
         JPanel leftPanel = new JPanel(new BorderLayout());
         searchResultsModel = new DefaultListModel<>();
         JList<String> searchResultsList = new JList<>(searchResultsModel);
+        searchResultsList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         JScrollPane scrollPane = new JScrollPane(searchResultsList);
         leftPanel.add(scrollPane, BorderLayout.CENTER);
         frame.add(scrollPane, BorderLayout.CENTER);
@@ -116,30 +117,34 @@ public class MainInterface {
         buttonDownload.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String selectedFile = searchResultsList.getSelectedValue();
-                if (selectedFile != null) {
-                    String modifiedString = selectedFile.substring(0, selectedFile.length() - 3);
-                    DownloadTaskManager dtm = clientManager.startDownloadThreads(modifiedString);
-                    dtmmap.remove(modifiedString);
-                    dtmmap.put(modifiedString, dtm);
+                List<String> selectedFiles = searchResultsList.getSelectedValuesList();
 
-                    dtm.addListener((filename, fileblock) -> {
-                        System.out.println("received update");
-                        SwingUtilities.invokeLater( ()-> {
-                            if(!donwloadResults.containsValue(filename)) {
-                                donwloadResults.put(filename,fileblock);
-                            }else{
-                                donwloadResults.replace(filename,fileblock);
-                            }
-                            downloadResultsModel.clear();
-                            donwloadResults.forEach((key,value)->{
-                                downloadResultsModel.addElement(key + " " +  value + "%");
+                if (!selectedFiles.isEmpty()) {     // Troca de verificação de null para uma verificação de lista vazia
+                    for (String selectedFile : selectedFiles) {      // Adicionado loop para descarregar simlultaneamente múltiplos ficheiros
+                        String modifiedString = selectedFile.substring(0, selectedFile.length() - 3);
+                        DownloadTaskManager dtm = clientManager.startDownloadThreads(modifiedString);
+                        dtmmap.remove(modifiedString);
+                        dtmmap.put(modifiedString, dtm);
+
+                        dtm.addListener((filename, fileblock) -> {
+                            System.out.println("received update");
+                            SwingUtilities.invokeLater(() -> {
+                                if (!donwloadResults.containsValue(filename)) {
+                                    donwloadResults.put(filename, fileblock);
+                                } else {
+                                    donwloadResults.replace(filename, fileblock);
+                                }
+                                downloadResultsModel.clear();
+                                donwloadResults.forEach((key, value) -> {
+                                    downloadResultsModel.addElement(key + " " + value + "%");
+                                });
                             });
                         });
-                    });
-                    JOptionPane.showMessageDialog(frame, "Download iniciado com sucesso.");
+                    }
+                    // Ajuste da mensagem para o plural
+                    JOptionPane.showMessageDialog(frame, selectedFiles.size() + " download(s) iniciado(s) com sucesso.");
                 } else {
-                    JOptionPane.showMessageDialog(frame, "Selecione um ficheiro primeiro.");
+                    JOptionPane.showMessageDialog(frame, "Selecione pelo menos um ficheiro.");
                 }
             }
         });
