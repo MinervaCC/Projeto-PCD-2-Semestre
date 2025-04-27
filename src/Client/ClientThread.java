@@ -1,6 +1,8 @@
 package Client;
 
 import Communication.Command;
+import Communication.MessageWrapper;
+import Communication.NewConnectionRequest;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -15,20 +17,40 @@ public class ClientThread extends Thread implements Comparable<ClientThread> {
         this.clientManager = clientManager;
         this.socketClient = new SocketClient(ip, port);
         this.clientName = UUID.randomUUID().toString();
-        socketClient.startSocket();
+
+        // Envia NewConnectionRequest após conectar
+        try {
+            socketClient.startSocket();
+            // Envia mensagem de pedido de conexão
+            socketClient.sendObject(
+                    Command.ConnectionRequest,
+                    new NewConnectionRequest(socketClient.getLocalIP(), socketClient.getLocalPort())
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Falha ao enviar NewConnectionRequest", e);
+        }
+
         this.start();
     }
+
 
     @Override
     public void run() {
         try {
+            // Aguarda confirmação (ConnectionAck)
+            MessageWrapper ack = socketClient.receiveObject();
+            if (ack.getCommand() != Command.ConnectionAck) {
+                throw new IOException("Conexão recusada pelo nó remoto");
+            }
+
+            System.out.println("Conexão confirmada com " + socketClient.getLocalIP() + ":" + socketClient.getLocalPort());
+
+            // Processamento normal das mensagens
             while (isRunning) {
                 this.clientManager.receive(socketClient.receiveObject(), this);
             }
-        } catch (InterruptedException e) {
-            System.out.println(clientName + " has been interrupted.");
-        } catch (Exception e) {
-            System.out.println("Error in " + clientName + ": " + e.getMessage());
+        } catch (InterruptedException | IOException e) {
+            System.out.println("Erro na conexão: " + e.getMessage());
         }
     }
 

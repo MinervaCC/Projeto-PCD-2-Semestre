@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import Client.ClientManager;
 import Communication.Command;
 import Communication.MessageWrapper;
+import Communication.NewConnectionRequest;
 import Download.FileBlockAnswerMessage;
 import Download.FileBlockRequestMessage;
 import Files.FileInfo;
@@ -140,6 +142,22 @@ public class SocketServer extends Thread {
 
                     case Command.String:{     // Para tratamento de Strings
                         out.writeObject(message);
+                        break;
+                    }
+
+                    // ***
+                    case ConnectionRequest: {
+                        // Processa pedido de conexão
+                        NewConnectionRequest request = (NewConnectionRequest) message.getData();
+                        System.out.println("Recebido pedido de conexão de " + request.getIp() + ":" + request.getPort());
+
+                        // Responde com ACK
+                        out.writeObject(new MessageWrapper(
+                                message.getServerIp(),
+                                message.getServerPort(),
+                                Command.ConnectionAck,
+                                null
+                        ));
                         break;
                     }
 

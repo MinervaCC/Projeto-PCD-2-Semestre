@@ -75,4 +75,12 @@ public class SocketClient  {
         }
     }
 
+    public String getLocalIP() {
+        return clientSocket.getLocalAddress().getHostAddress();
+    }
+
+    public int getLocalPort() {
+        return clientSocket.getLocalPort();
+    }
+
 }

@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.LinkedList;
 import java.util.Queue;
 
+
 public class ClientManager {
     // Campos declarados corretamente
     private final Map<ClientThread, Boolean> clientThreads;
@@ -23,6 +24,7 @@ public class ClientManager {
     private String currentSearchTerm;
     private final Queue<Runnable> queue = new LinkedList<>();
     private final List<Thread> workerThreads = new ArrayList<>();
+    private static ClientManager instance; // Campo estático
 
     public ClientManager() {
         this.clientThreads = new TreeMap<>();
@@ -197,4 +199,13 @@ public class ClientManager {
             listener.onRequestComplete();
         }
     }
+
+    // singleton
+    public static synchronized ClientManager getInstance() {
+        if (instance == null) {
+            instance = new ClientManager();
+        }
+        return instance;
+    }
+
 }
