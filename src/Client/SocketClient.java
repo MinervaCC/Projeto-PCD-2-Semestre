@@ -24,7 +24,6 @@ public class SocketClient  {
     public synchronized void startSocket(){
         try{
             this.clientSocket = new Socket(ip, port);   // Conecta-se ao servidor com determinado IP e por uma determinada porta
-            System.out.println(clientSocket.getLocalPort());
             System.out.println("Client connected to " + ip + ":" + port);
             this.out = new ObjectOutputStream(clientSocket.getOutputStream());  // Iniciado o fluxo de saída
             this.in = new ObjectInputStream(clientSocket.getInputStream());   // Iniciado o fluxo de entrada
@@ -81,6 +80,14 @@ public class SocketClient  {
 
     public int getLocalPort() {
         return clientSocket.getLocalPort();
+    }
+
+    public String getRemoteIP() {
+        return ip;
+    }
+
+    public int getRemotePort() {
+        return port;
     }
 
 }

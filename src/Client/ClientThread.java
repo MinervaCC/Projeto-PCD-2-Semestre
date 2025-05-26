@@ -24,7 +24,7 @@ public class ClientThread extends Thread implements Comparable<ClientThread> {
             // Envia mensagem de pedido de conexão
             socketClient.sendObject(
                     Command.ConnectionRequest,
-                    new NewConnectionRequest(socketClient.getLocalIP(), socketClient.getLocalPort())
+                    new NewConnectionRequest(socketClient.getLocalIP(), socketClient.getRemotePort())
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Falha ao enviar NewConnectionRequest", e);
@@ -43,7 +43,7 @@ public class ClientThread extends Thread implements Comparable<ClientThread> {
                 throw new IOException("Conexão recusada pelo nó remoto");
             }
 
-            System.out.println("Conexão confirmada com " + socketClient.getLocalIP() + ":" + socketClient.getLocalPort());
+            System.out.println("Conexão confirmada com " + socketClient.getRemoteIP() + ":" + socketClient.getRemotePort());
 
             // Processamento normal das mensagens
             while (isRunning) {
