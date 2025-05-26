@@ -64,7 +64,7 @@ public class SocketServer extends Thread {
                 Socket socket = serverSocket.accept();   // Aceita uma nova conexão de cliente
                 new Thread(() -> {
                     try {
-                        System.out.println("Server accepted connection from " + socket.getInetAddress().getHostAddress() + " on thread " + Thread.currentThread().getName() );
+                        // Will print "Server accepted connection from" after receiving the NewConnectionRequest
                         handleClient(socket);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -150,6 +150,7 @@ public class SocketServer extends Thread {
                         // Processa pedido de conexão
                         NewConnectionRequest request = (NewConnectionRequest) message.getData();
                         System.out.println("Server received connection request from " + request.getIp() + ":" + request.getPort());
+                        System.out.println("Server accepted connection from " + request.getIp() + " on thread " + Thread.currentThread().getName());
 
                         // Responde com ACK
                         out.writeObject(new MessageWrapper(

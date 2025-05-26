@@ -24,7 +24,7 @@ public class ClientThread extends Thread implements Comparable<ClientThread> {
             // Envia mensagem de pedido de conexão
             socketClient.sendObject(
                     Command.ConnectionRequest,
-                    new NewConnectionRequest(socketClient.getLocalIP(), socketClient.getRemotePort())
+                    new NewConnectionRequest(socketClient.getRemoteIP(), socketClient.getRemotePort())
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Falha ao enviar NewConnectionRequest", e);

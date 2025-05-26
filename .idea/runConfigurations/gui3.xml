@@ -2,7 +2,7 @@
   <configuration default="false" name="gui3" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="Node" />
     <module name="P2P-PCDProject" />
-    <option name="PROGRAM_PARAMETERS" value="127.0.0.1 8083" />
+    <option name="PROGRAM_PARAMETERS" value="127.0.0.3 8083" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
