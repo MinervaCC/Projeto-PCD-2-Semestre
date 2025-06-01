@@ -100,6 +100,7 @@ public class MainInterface {
             timeoutTimer.setRepeats(false);
             timeoutTimer.start();
 
+            // ***
             clientManager.addListener(() -> {
                 timeoutTimer.stop();
                 SwingUtilities.invokeLater(() -> {

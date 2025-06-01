@@ -102,21 +102,13 @@ public class ClientManager {
                                     clientThreads.replace(clientThread, true);
                                     clientThread.sendObject(command, message);
                                 } catch (IOException | InterruptedException e) {
-                                    synchronized (ClientManager.this) {
-                                        if (currentSearchLatch != null) {
-                                            currentSearchLatch.countDown();
-                                        }
-                                    }
+
                                 } finally {
                                     clientThreads.replace(clientThread, false);
                                 }
                             }
                         });
                         queue.notify();
-                    }
-                } else {
-                    if (currentSearchLatch != null) {
-                        currentSearchLatch.countDown();
                     }
                 }
             }
@@ -127,13 +119,14 @@ public class ClientManager {
         switch (message.getCommand()) {
             case FileSearchResult: {
                 FileSearchResult[] received = (FileSearchResult[]) message.getData();
+                if (currentSearchLatch != null) {
+                    currentSearchLatch.countDown();
+                }
                 for (FileSearchResult file : received) {
                     addToFileSearchResult(file);
                 }
                 clientThreads.replace(clientThread, false);
-                if (currentSearchLatch != null) {
-                    currentSearchLatch.countDown();
-                }
+
                 break;
             }
             case DownloadResult: {
@@ -162,7 +155,10 @@ public class ClientManager {
             newList.add(file);
             this.FileSearchDB.put(fileHash, newList);
         }
-        notifyListeners();
+        if(currentSearchLatch.getCount() == 0) {
+            notifyListeners();
+        }
+
     }
 
     public void resetFileSearchDB() {
